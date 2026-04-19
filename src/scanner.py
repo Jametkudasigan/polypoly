@@ -4,7 +4,7 @@ Polymarket Market Scanner for BTC Up/Down 5-minute markets
 import logging
 import requests
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, List
 from config.settings import BotConfig
 
@@ -18,37 +18,20 @@ class MarketScanner:
         self.session = requests.Session()
     
     def get_btc_5min_markets(self) -> List[Dict]:
-        """
-        Find BTC Up/Down 5-minute markets
-        Returns list of valid markets within time filter
-        """
+        """Find BTC Up/Down 5-minute markets"""
         all_markets = []
         
-        # Method 1: Events endpoint
-        try:
-            events_markets = self._scan_events()
-            all_markets.extend(events_markets)
-            logger.info(f"Events scan: {len(events_markets)} markets")
-        except Exception as e:
-            logger.debug(f"Events scan error: {e}")
+        # Method 1: Cari via slug dengan Unix timestamp
+        ts_markets = self._scan_by_unix_timestamp()
+        all_markets.extend(ts_markets)
         
-        # Method 2: Markets endpoint (if events found nothing)
+        # Method 2: Fallback ke events endpoint
         if not all_markets:
             try:
-                direct_markets = self._scan_markets()
-                all_markets.extend(direct_markets)
-                logger.info(f"Direct markets scan: {len(direct_markets)} markets")
+                events_markets = self._scan_events()
+                all_markets.extend(events_markets)
             except Exception as e:
-                logger.debug(f"Markets scan error: {e}")
-        
-        # Method 3: Timestamp slug search
-        if not all_markets:
-            try:
-                ts_markets = self._scan_by_timestamp()
-                all_markets.extend(ts_markets)
-                logger.info(f"Timestamp scan: {len(ts_markets)} markets")
-            except Exception as e:
-                logger.debug(f"Timestamp scan error: {e}")
+                logger.debug(f"Events scan error: {e}")
         
         # Sort by closest to ideal 5-minute window
         all_markets.sort(key=lambda x: abs(x["time_remaining"] - 5))
@@ -56,8 +39,47 @@ class MarketScanner:
         logger.info(f"Total BTC 5m markets found: {len(all_markets)}")
         return all_markets
     
+    def _scan_by_unix_timestamp(self) -> List[Dict]:
+        """
+        Generate Unix timestamp-based slugs seperti:
+        btc-updown-5m-1776634800
+        """
+        now = datetime.now(timezone.utc)
+        btc_markets = []
+        
+        # Generate beberapa timestamp window (5 menit interval)
+        # Cari yang aktif dalam range waktu yang valid
+        for i in range(-5, 10):
+            # Round ke kelipatan 5 menit terdekat
+            minutes = (now.minute // 5) * 5
+            base_time = now.replace(minute=minutes, second=0, microsecond=0)
+            target_time = base_time + timedelta(minutes=5*i)
+            
+            unix_ts = int(target_time.timestamp())
+            slug = f"btc-updown-5m-{unix_ts}"
+            
+            try:
+                url = f"{self.config.gamma_host}/events/slug/{slug}"
+                logger.debug(f"Checking slug: {slug}")
+                response = self.session.get(url, timeout=5)
+                
+                if response.status_code == 200:
+                    event = response.json()
+                    markets = event.get("markets", [])
+                    
+                    for market in markets:
+                        processed = self._process_single_market(market, event)
+                        if processed:
+                            btc_markets.append(processed)
+                            logger.info(f"✅ Found market via slug: {slug}")
+                            
+            except requests.RequestException:
+                continue
+        
+        return btc_markets
+    
     def _scan_events(self) -> List[Dict]:
-        """Scan via /events endpoint"""
+        """Scan via /events endpoint sebagai fallback"""
         url = f"{self.config.gamma_host}/events"
         params = {
             "active": "true",
@@ -70,89 +92,29 @@ class MarketScanner:
         response.raise_for_status()
         events = response.json()
         
-        return self._process_items(events, item_type="event")
-    
-    def _scan_markets(self) -> List[Dict]:
-        """Scan via /markets endpoint"""
-        url = f"{self.config.gamma_host}/markets"
-        params = {
-            "active": "true",
-            "closed": "false",
-            "archived": "false",
-            "limit": 100
-        }
-        
-        response = self.session.get(url, params=params, timeout=15)
-        response.raise_for_status()
-        markets = response.json()
-        
-        return self._process_items(markets, item_type="market")
-    
-    def _scan_by_timestamp(self) -> List[Dict]:
-        """Generate and check timestamp-based slugs"""
-        now = datetime.utcnow()
-        btc_markets = []
-        
-        # Generate timestamps: 10 windows back, current, 10 forward
-        for i in range(-10, 11):
-            ts = now + timedelta(minutes=5*i)
-            ts_str = ts.strftime("%Y%m%d%H%M")
-            slug = f"btc-updown-5m-{ts_str}"
-            
-            try:
-                url = f"{self.config.gamma_host}/events/slug/{slug}"
-                response = self.session.get(url, timeout=3)
-                
-                if response.status_code == 200:
-                    event = response.json()
-                    markets = event.get("markets", [])
-                    
-                    for market in markets:
-                        processed = self._process_single_market(market, event)
-                        if processed:
-                            btc_markets.append(processed)
-                            logger.info(f"Found market via slug: {slug}")
-                            
-            except requests.RequestException:
-                continue
-        
-        return btc_markets
-    
-    def _process_items(self, items: List[Dict], item_type: str = "event") -> List[Dict]:
-        """Process events or markets to find BTC 5m"""
         btc_markets = []
         now = datetime.now().astimezone()
         
-        for item in items:
-            if item_type == "event":
-                title = item.get("title", "").lower()
-                slug = item.get("slug", "").lower()
-                markets = item.get("markets", [])
-            else:
-                title = item.get("question", "").lower()
-                slug = item.get("slug", "").lower()
-                markets = [item]
+        for event in events:
+            title = event.get("title", "").lower()
+            slug = event.get("slug", "").lower()
             
-            # Broader BTC detection
-            has_btc = any(term in title or term in slug 
-                         for term in ["btc", "bitcoin", "xbt"])
-            has_direction = any(term in title or term in slug 
-                              for term in ["up", "down", "higher", "lower"])
-            has_timeframe = any(term in title or term in slug 
-                              for term in ["5m", "5 minute", "5-minute", "5min", "5-min"])
+            # Cek apakah BTC 5m market
+            is_btc = any(term in title or term in slug for term in ["btc", "bitcoin"])
+            is_5m = "5m" in slug or "5-minute" in slug or "5min" in slug
             
-            if not (has_btc and has_direction and has_timeframe):
+            if not (is_btc and is_5m):
                 continue
             
-            for market in markets:
-                processed = self._process_single_market(market, item if item_type == "event" else None)
+            for market in event.get("markets", []):
+                processed = self._process_single_market(market, event)
                 if processed:
                     btc_markets.append(processed)
         
         return btc_markets
     
     def _process_single_market(self, market: Dict, event: Optional[Dict]) -> Optional[Dict]:
-        """Process single market and check time filter"""
+        """Process single market dan cek time filter"""
         if not market:
             return None
         
@@ -161,11 +123,14 @@ class MarketScanner:
             return None
         
         try:
+            # Parse ISO date
             end_time = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-            time_remaining = (end_time - datetime.now().astimezone()).total_seconds() / 60
+            now = datetime.now().astimezone()
+            time_remaining = (end_time - now).total_seconds() / 60
             
-            # Apply time filter
+            # Apply time filter dari config
             if not (self.config.min_time_remaining <= time_remaining <= self.config.max_time_remaining):
+                logger.debug(f"Time remaining {time_remaining:.1f}m outside range")
                 return None
             
             return {
@@ -175,14 +140,16 @@ class MarketScanner:
                 "end_time": end_time,
                 "condition_id": market.get("conditionId"),
                 "question": market.get("question", event.get("title", "Unknown") if event else "Unknown"),
-                "token_ids": self._extract_token_ids(market)
+                "token_ids": self._extract_token_ids(market),
+                "slug": event.get("slug", "") if event else market.get("slug", "")
             }
             
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Error processing market: {e}")
             return None
     
     def _extract_token_ids(self, market: Dict) -> Dict[str, str]:
-        """Extract Yes/No token IDs from market data"""
+        """Extract Yes/No token IDs dari market data"""
         token_ids = {"yes": None, "no": None}
         
         try:
@@ -200,9 +167,9 @@ class MarketScanner:
                 tokens = market.get("tokens", [])
                 for token in tokens:
                     outcome = token.get("outcome", "").lower()
-                    if outcome in ["yes", "up", "higher"]:
+                    if outcome in ["yes", "up"]:
                         token_ids["yes"] = token.get("token_id") or token.get("tokenId")
-                    elif outcome in ["no", "down", "lower"]:
+                    elif outcome in ["no", "down"]:
                         token_ids["no"] = token.get("token_id") or token.get("tokenId")
         
         except Exception as e:
