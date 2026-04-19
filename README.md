@@ -21,3 +21,38 @@ Bot automation untuk trading market BTC Up/Down 5 menit di Polymarket menggunaka
 - Threshold Price: 0.45 - 0.55
 - Time Filter: 2-10 menit (sweet spot)
 - Position Size: $1 per trade
+
+
+## 🚀 Setup & Installation
+
+Clone Repository
+```bash
+git clone https://github.com/username/polymarket-btc-bot.git
+cd polymarket-btc-bot
+```
+
+Install dependencies
+```
+pip install -r requirements.txt
+```
+
+Konfigurasi Environment
+```
+nano .env
+```
+
+Dapatkan Credentials dari Polymarket
+Untuk Email/Magic Wallet:
+1. 
+Login ke Polymarket
+2. 
+Go to Settings → Private Key
+3. 
+Export private key
+4. 
+Copy Proxy Wallet Address dari Settings
+
+RUN BOT
+```
+python src/bot.py
+```
