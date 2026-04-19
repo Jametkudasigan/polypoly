@@ -3,6 +3,15 @@
 Polymarket BTC Up/Down 5-Minute Automation Bot
 Main orchestrator implementing RSI-based momentum strategy
 """
+import sys
+import os
+from pathlib import Path
+
+# Add project root to Python path
+# Ini memastikan folder config dan src bisa diimport
+project_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(project_root))
+
 import time
 import logging
 from datetime import datetime
@@ -192,14 +201,6 @@ class PolymarketBTCBot:
             return
         
         logger.info("💰 Attempting to exit position...")
-        
-        # In a real implementation, you would:
-        # 1. Check if position is redeemable
-        # 2. Call redeem function via relayer if won
-        # 3. Or sell position on market if not expired
-        
-        # For now, we just reset the state
-        # TODO: Implement actual redemption logic using py-builder-relayer-client
         
         winning_outcome = self.monitor.get_winning_outcome(
             self.current_position["condition_id"]
