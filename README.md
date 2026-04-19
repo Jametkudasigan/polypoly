@@ -47,6 +47,10 @@ Konfigurasi Environment
 ```
 nano config/.env
 ```
+buat folder log
+```
+mkdir -p /home/ubuntu/polypoly/logs
+```
 
 Dapatkan Credentials dari Polymarket
 Untuk Email/Magic Wallet:
