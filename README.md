@@ -28,7 +28,7 @@ Bot automation untuk trading market BTC Up/Down 5 menit di Polymarket menggunaka
 Clone Repository
 ```bash
 git clone https://github.com/Jametkudasigan/polypoly.git
-cd polymarket-btc-bot
+cd polypoly
 ```
 
 Install dependencies
