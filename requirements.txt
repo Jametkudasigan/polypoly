@@ -1,0 +1,13 @@
+# ==========================================
+# Polymarket BTC Bot - Requirements
+# ==========================================
+# Install semua dependencies:
+#   pip install -r requirements.txt
+#
+# Atau install per kategori:
+#   pip install -r requirements-core.txt
+#   pip install -r requirements-polymarket.txt
+# ==========================================
+
+-r requirements-core.txt
+-r requirements-polymarket.txt
