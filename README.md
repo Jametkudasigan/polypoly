@@ -38,7 +38,7 @@ pip install -r requirements.txt
 
 Konfigurasi Environment
 ```
-nano .env
+nano config/.env
 ```
 
 Dapatkan Credentials dari Polymarket
