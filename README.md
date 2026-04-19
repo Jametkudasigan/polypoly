@@ -61,5 +61,6 @@ Copy Proxy Wallet Address dari Settings
 
 RUN BOT
 ```
-python src/bot.py
+cd /home/ubuntu/polypoly
+python -m src.bot
 ```
