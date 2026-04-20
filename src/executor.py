@@ -23,6 +23,7 @@ class TradeExecutor:
     def _initialize_client(self) -> ClobClient:
         """Initialize CLOB client with authentication"""
         try:
+            # Initialize client dengan funder address
             client = ClobClient(
                 host=self.config.clob_host,
                 key=self.config.private_key,
@@ -31,11 +32,13 @@ class TradeExecutor:
                 funder=self.config.funder_address
             )
             
-            # Create or derive API credentials
-            creds = client.create_or_derive_api_creds()
+            # Derive API key dari private key
+            logger.info("Deriving API credentials...")
+            creds = client.derive_api_key()
             client.set_api_creds(creds)
             
-            logger.info("CLOB Client connected")
+            logger.info(f"CLOB Client connected (Signature Type: {self.config.signature_type})")
+            logger.info(f"Funder: {self.config.funder_address[:20]}...")
             return client
             
         except Exception as e:
@@ -74,83 +77,54 @@ class TradeExecutor:
     def place_market_order(self, token_id: str, side: str, amount_usdc: float) -> Optional[Dict]:
         """
         Place a market order (Fill or Kill)
-        
-        Args:
-            token_id: Token ID to trade
-            side: "BUY" or "SELL"
-            amount_usdc: Amount in USDC
-        
-        Returns:
-            Order response or None if failed
         """
         try:
             logger.info(f"Placing MARKET {side} order: ${amount_usdc}")
+            logger.debug(f"Token: {token_id[:30]}...")
             
+            # Gunakan GTC (Good Till Cancel) untuk market order yang lebih reliable
+            # atau FOK (Fill or Kill) untuk instant execution
             order_args = MarketOrderArgs(
                 token_id=token_id,
                 amount=amount_usdc,
                 side=BUY if side == "BUY" else SELL,
-                order_type=OrderType.FOK  # Fill or Kill
+                order_type=OrderType.GTC  # GTC lebih reliable dari FOK
             )
             
+            # Buat signed order
             signed_order = self.client.create_market_order(order_args)
-            response = self.client.post_order(signed_order, OrderType.FOK)
+            logger.debug(f"Order signed successfully")
             
-            if response and response.get("success"):
-                logger.info(f"Order executed: {response.get('orderID', 'N/A')}")
-                return response
-            else:
-                logger.error(f"Order failed: {response}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error placing market order: {e}")
-            return None
-    
-    def place_limit_order(self, token_id: str, side: str, price: float, size: float) -> Optional[Dict]:
-        """
-        Place a limit order (Good Till Cancelled)
-        
-        Args:
-            token_id: Token ID to trade
-            side: "BUY" or "SELL"
-            price: Limit price (0-1)
-            size: Position size
-        
-        Returns:
-            Order response or None if failed
-        """
-        try:
-            logger.info(f"Placing LIMIT {side} order: {size} @ {price}")
-            
-            order_args = OrderArgs(
-                token_id=token_id,
-                price=price,
-                size=size,
-                side=BUY if side == "BUY" else SELL
-            )
-            
-            signed_order = self.client.create_order(order_args)
+            # Submit order
             response = self.client.post_order(signed_order, OrderType.GTC)
             
-            if response and response.get("success"):
-                logger.info(f"Limit order placed: {response.get('orderID', 'N/A')}")
-                return response
+            if response:
+                # Cek berbagai format response
+                success = response.get("success", False)
+                order_id = response.get("orderID") or response.get("order_id") or response.get("id")
+                
+                if success or order_id:
+                    logger.info(f"✅ Order executed: {order_id}")
+                    return {
+                        "success": True,
+                        "orderID": order_id,
+                        "response": response
+                    }
+                else:
+                    error_msg = response.get("error", response.get("message", "Unknown error"))
+                    logger.error(f"❌ Order failed: {error_msg}")
+                    logger.debug(f"Full response: {response}")
+                    return None
             else:
-                logger.error(f"Limit order failed: {response}")
+                logger.error("❌ Empty response from server")
                 return None
                 
         except Exception as e:
-            logger.error(f"Error placing limit order: {e}")
+            logger.error(f"❌ Error placing market order: {e}")
+            # Log detail error untuk debugging
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
             return None
-    
-    def get_open_orders(self) -> list:
-        """Get list of open orders"""
-        try:
-            return self.client.get_orders()
-        except Exception as e:
-            logger.error(f"Error fetching open orders: {e}")
-            return []
     
     def cancel_all_orders(self) -> bool:
         """Cancel all open orders"""
