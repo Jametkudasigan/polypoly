@@ -2,7 +2,7 @@
 Configuration settings for Polymarket BTC Bot
 """
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -35,22 +35,12 @@ class BotConfig:
     data_host: str = os.getenv("DATA_HOST", "https://data-api.polymarket.com")
     chain_id: int = int(os.getenv("CHAIN_ID", "137"))
     
-    # Builder API (Optional - untuk relayer gasless)
-    builder_api_key: str = os.getenv("BUILDER_API_KEY", "")
-    builder_secret: str = os.getenv("BUILDER_SECRET", "")
-    builder_passphrase: str = os.getenv("BUILDER_PASSPHRASE", "")
-    
-    # Market Filters
-    market_keywords: list = None
-    
-    def __post_init__(self):
-        if self.market_keywords is None:
-            self.market_keywords = ["btc", "bitcoin", "up", "down", "5m", "5 minute"]
-    
     def validate(self) -> bool:
         """Validate configuration"""
         if not self.private_key:
             raise ValueError("POLYMARKET_PRIVATE_KEY is required")
         if not self.funder_address:
             raise ValueError("POLYMARKET_FUNDER_ADDRESS is required")
+        if not self.private_key.startswith("0x"):
+            raise ValueError("Private key must start with 0x")
         return True
