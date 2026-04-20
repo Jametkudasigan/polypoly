@@ -36,7 +36,11 @@ class MarketScanner:
         # Sort by closest to ideal 5-minute window
         all_markets.sort(key=lambda x: abs(x["time_remaining"] - 5))
         
-        logger.info(f"Total BTC 5m markets found: {len(all_markets)}")
+        if all_markets:
+            logger.info(f"Found {len(all_markets)} BTC 5m market(s)")
+        else:
+            logger.info("No BTC 5m markets found")
+        
         return all_markets
     
     def _scan_by_unix_timestamp(self) -> List[Dict]:
@@ -60,7 +64,6 @@ class MarketScanner:
             
             try:
                 url = f"{self.config.gamma_host}/events/slug/{slug}"
-                logger.debug(f"Checking slug: {slug}")
                 response = self.session.get(url, timeout=5)
                 
                 if response.status_code == 200:
@@ -71,7 +74,7 @@ class MarketScanner:
                         processed = self._process_single_market(market, event)
                         if processed:
                             btc_markets.append(processed)
-                            logger.info(f"✅ Found market via slug: {slug}")
+                            logger.debug(f"Found market via slug: {slug}")
                             
             except requests.RequestException:
                 continue
