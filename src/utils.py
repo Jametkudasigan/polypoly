@@ -1,12 +1,11 @@
 """
-Utility functions for Polymarket BTC Bot - Terminal UI Style
+Utility functions for Polymarket BTC Bot - Single Bingkai Style
 """
 import logging
 import sys
 import os
-import shutil
 from datetime import datetime
-from colorama import init, Fore, Style, Back
+from colorama import init, Fore, Style
 
 # Initialize colorama
 init(autoreset=True)
@@ -16,18 +15,6 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("requests").setLevel(logging.WARNING)
-
-# Box drawing characters (Unicode)
-H = "═"
-V = "║"
-TL = "╔"
-TR = "╗"
-BL = "╚"
-BR = "╝"
-L = "╠"
-R = "╣"
-T = "╦"
-B = "╩"
 
 class ColoredFormatter(logging.Formatter):
     """Custom formatter with colors"""
@@ -73,19 +60,34 @@ def setup_logging():
     
     return logger
 
-def get_terminal_width():
-    """Get terminal width, default to 70"""
-    try:
-        return shutil.get_terminal_size().columns
-    except:
-        return 70
-
 def clear_screen():
     """Clear terminal screen"""
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def box_line(text="", width=68, align="left", color=Fore.GREEN):
-    """Create a box line with text"""
+# Bingkai characters
+H = "═"
+V = "║"
+TL = "╔"
+TR = "╗"
+BL = "╚"
+BR = "╝"
+L = "╠"
+R = "╣"
+
+def bingkai_top(width=70, color=Fore.GREEN):
+    """Print top border bingkai"""
+    print(f"{color}{TL}{H * (width - 2)}{TR}{Style.RESET_ALL}")
+
+def bingkai_bottom(width=70, color=Fore.GREEN):
+    """Print bottom border bingkai"""
+    print(f"{color}{BL}{H * (width - 2)}{BR}{Style.RESET_ALL}")
+
+def bingkai_separator(width=70, color=Fore.GREEN):
+    """Print separator line (horizontal dalam bingkai)"""
+    print(f"{color}{L}{H * (width - 2)}{R}{Style.RESET_ALL}")
+
+def bingkai_line(text="", width=68, color=Fore.GREEN, align="left"):
+    """Print line inside bingkai"""
     if align == "center":
         text = text.center(width)
     elif align == "right":
@@ -94,20 +96,8 @@ def box_line(text="", width=68, align="left", color=Fore.GREEN):
         text = text.ljust(width)
     return f"{Fore.GREEN}{V}{Style.RESET_ALL} {color}{text}{Style.RESET_ALL} {Fore.GREEN}{V}{Style.RESET_ALL}"
 
-def box_border(top=True, width=70, color=Fore.GREEN):
-    """Print box border"""
-    char = TL if top else BL
-    char2 = TR if top else BR
-    line = H * (width - 2)
-    print(f"{color}{char}{line}{char2}{Style.RESET_ALL}")
-
-def box_separator(width=70):
-    """Print separator line inside box"""
-    line = H * (width - 2)
-    print(f"{Fore.GREEN}{L}{line}{R}{Style.RESET_ALL}")
-
 def format_rsi_status(rsi, oversold, overbought):
-    """Format RSI with color and status"""
+    """Format RSI dengan color dan status"""
     if rsi < oversold:
         return Fore.RED, "OVERSOLD ↓", "BUY UP", Fore.RED
     elif rsi > overbought:
@@ -116,7 +106,7 @@ def format_rsi_status(rsi, oversold, overbought):
         return Fore.YELLOW, "NEUTRAL ↔", "SKIP", Fore.YELLOW
 
 def format_time_status(time_remaining, min_time, max_time):
-    """Format time with status"""
+    """Format time dengan status"""
     if min_time <= time_remaining <= max_time:
         return Fore.GREEN, "✅ SWEET SPOT"
     elif time_remaining < min_time:
@@ -125,145 +115,127 @@ def format_time_status(time_remaining, min_time, max_time):
         return Fore.YELLOW, "⏳ WAITING"
 
 def print_scanning_ui(scan_num, balance, rsi, market_data, config, markets_found=0, yes_price=0, no_price=0):
-    """Print beautiful scanning UI like screenshot"""
+    """Print scanning UI dalam SATU bingkai besar"""
     clear_screen()
     w = 70
     
+    # === SATU BINGKAI BESAR ===
+    bingkai_top(w, Fore.GREEN)
+    
     # Header
-    box_border(True, w)
-    print(box_line(f"🔍 SCANNING MARKET #{scan_num}", w, "center", Fore.CYAN + Style.BRIGHT))
-    box_border(False, w)
-    print()
+    print(bingkai_line(f"🔍 SCANNING MARKET #{scan_num}", w-2, Fore.CYAN + Style.BRIGHT, "center"))
+    bingkai_separator(w, Fore.GREEN)
     
     # WALLET Section
-    box_border(True, w)
-    print(box_line("💰 WALLET", w, "left", Fore.CYAN))
-    box_separator(w)
-    print(box_line(f"USDC Balance : ${balance:,.2f}", w, "left", Fore.GREEN))
-    box_border(False, w)
-    print()
+    print(bingkai_line("💰 WALLET", w-2, Fore.CYAN, "left"))
+    print(bingkai_line(f"USDC Balance : ${balance:,.2f}", w-2, Fore.GREEN))
+    bingkai_separator(w, Fore.GREEN)
     
     # MOMENTUM Section
-    box_border(True, w)
-    print(box_line("📊 MOMENTUM (Yahoo Finance)", w, "left", Fore.CYAN))
-    box_separator(w)
+    print(bingkai_line("📊 MOMENTUM (Yahoo Finance)", w-2, Fore.CYAN, "left"))
     
     rsi_color, rsi_status, signal, action_color = format_rsi_status(rsi, config.rsi_oversold, config.rsi_overbought)
-    print(box_line(f"BTC RSI (5m) : {rsi_color}{rsi:.2f}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-    print(box_line(f"Status       : {rsi_color}{rsi_status}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-    box_border(False, w)
-    print()
+    print(bingkai_line(f"BTC RSI (5m) : {rsi_color}{rsi:.2f}{Style.RESET_ALL}", w-2, Fore.GREEN))
+    print(bingkai_line(f"Status       : {rsi_color}{rsi_status}{Style.RESET_ALL}", w-2, Fore.GREEN))
+    bingkai_separator(w, Fore.GREEN)
     
     # MARKET Section
     if market_data:
-        box_border(True, w)
-        print(box_line("🎯 MARKET", w, "left", Fore.CYAN))
-        box_separator(w)
+        print(bingkai_line("🎯 MARKET", w-2, Fore.CYAN, "left"))
         
         question = market_data.get("question", "Unknown")
-        condition_id = market_data.get("condition_id", "")[:25] + "..."
+        condition_id = market_data.get("condition_id", "")[:35] + "..."
         
-        print(box_line(f"Question   : {Fore.MAGENTA}{question}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-        print(box_line(f"Condition  : {Fore.CYAN}{condition_id}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-        box_separator(w)
+        print(bingkai_line(f"Question   : {Fore.MAGENTA}{question}{Style.RESET_ALL}", w-2, Fore.GREEN))
+        print(bingkai_line(f"Condition  : {Fore.CYAN}{condition_id}{Style.RESET_ALL}", w-2, Fore.GREEN))
+        bingkai_separator(w, Fore.GREEN)
         
         if yes_price and no_price:
             spread = abs(yes_price - no_price)
-            print(box_line(f"YES Price  : $ {yes_price:.3f}", w, "left", Fore.GREEN))
-            print(box_line(f"NO Price   : $ {no_price:.3f}", w, "left", Fore.GREEN))
-            print(box_line(f"Spread     : $ {spread:.3f}", w, "left", Fore.GREEN))
-            box_separator(w)
+            print(bingkai_line(f"YES Price  : $ {yes_price:.3f}", w-2, Fore.GREEN))
+            print(bingkai_line(f"NO Price   : $ {no_price:.3f}", w-2, Fore.GREEN))
+            print(bingkai_line(f"Spread     : $ {spread:.3f}", w-2, Fore.GREEN))
+            bingkai_separator(w, Fore.GREEN)
         
         time_remaining = market_data.get("time_remaining", 0)
         time_color, time_status = format_time_status(time_remaining, config.min_time_remaining, config.max_time_remaining)
         
-        print(box_line(f"Time Left  : {time_color}{time_remaining:.1f}m {time_status}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-        print(box_line(f"Status     : {Fore.GREEN}ACTIVE{Style.RESET_ALL}", w, "left", Fore.GREEN))
-        box_border(False, w)
-        print()
+        print(bingkai_line(f"Time Left  : {time_color}{time_remaining:.1f}m {time_status}{Style.RESET_ALL}", w-2, Fore.GREEN))
+        print(bingkai_line(f"Status     : {Fore.GREEN}ACTIVE{Style.RESET_ALL}", w-2, Fore.GREEN))
+        bingkai_separator(w, Fore.GREEN)
         
         # SIGNAL ANALYSIS Section
-        box_border(True, w)
-        print(box_line("🎯 SIGNAL ANALYSIS", w, "left", Fore.CYAN))
-        box_separator(w)
+        print(bingkai_line("🎯 SIGNAL ANALYSIS", w-2, Fore.CYAN, "left"))
         
         confidence = "HIGH" if rsi < 20 or rsi > 80 else ("MEDIUM" if rsi < 30 or rsi > 70 else "NONE")
         
-        print(box_line(f"Action     : {action_color}{signal}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-        print(box_line(f"Confidence : {Fore.YELLOW}{confidence}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-        print(box_line(f"Position   : {action_color}{signal}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-        box_border(False, w)
-        print()
-        
-        # Bottom note
-        print(f"{Fore.CYAN}• RSI {rsi:.2f} {rsi_status.lower().split()[0]}{Style.RESET_ALL}")
+        print(bingkai_line(f"Action     : {action_color}{signal}{Style.RESET_ALL}", w-2, Fore.GREEN))
+        print(bingkai_line(f"Confidence : {Fore.YELLOW}{confidence}{Style.RESET_ALL}", w-2, Fore.GREEN))
+        print(bingkai_line(f"Position   : {action_color}{signal}{Style.RESET_ALL}", w-2, Fore.GREEN))
     else:
-        box_border(True, w, Fore.RED)
-        print(box_line("🎯 MARKET", w, "left", Fore.CYAN))
-        box_separator(w, Fore.RED)
-        print(box_line(f"Status     : {Fore.RED}NO MARKET FOUND{Style.RESET_ALL}", w, "left", Fore.RED))
-        print(box_line(f"Markets    : {Fore.YELLOW}{markets_found} found{Style.RESET_ALL}", w, "left", Fore.RED))
-        box_border(False, w, Fore.RED)
-        print()
+        print(bingkai_line("🎯 MARKET", w-2, Fore.CYAN, "left"))
+        print(bingkai_line(f"Status     : {Fore.RED}NO MARKET FOUND{Style.RESET_ALL}", w-2, Fore.RED))
+        print(bingkai_line(f"Markets    : {Fore.YELLOW}{markets_found} found{Style.RESET_ALL}", w-2, Fore.RED))
+    
+    bingkai_bottom(w, Fore.GREEN)
+    print()
+    
+    # Bottom note (di luar bingkai)
+    if market_data:
+        print(f"{Fore.CYAN}• RSI {rsi:.2f} {rsi_status.lower().split()[0]}{Style.RESET_ALL}")
 
 def print_monitoring_ui(position, time_left, pnl=0):
-    """Print beautiful monitoring UI"""
+    """Print monitoring UI dalam SATU bingkai besar"""
     clear_screen()
     w = 70
     
+    bingkai_top(w, Fore.GREEN)
+    
     # Header
-    box_border(True, w)
-    print(box_line("📈 MONITORING POSITION", w, "center", Fore.GREEN + Style.BRIGHT))
-    box_border(False, w)
-    print()
+    print(bingkai_line("📈 MONITORING POSITION", w-2, Fore.GREEN + Style.BRIGHT, "center"))
+    bingkai_separator(w, Fore.GREEN)
     
     # Position Details
-    box_border(True, w)
-    print(box_line("💰 POSITION", w, "left", Fore.CYAN))
-    box_separator(w)
-    print(box_line(f"Entry Amount : ${position.get('entry_amount', 0):.2f} USDC", w, "left", Fore.GREEN))
-    print(box_line(f"Side         : {Fore.BLUE}{position.get('side', 'UNKNOWN')}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-    print(box_line(f"Market       : {Fore.MAGENTA}{position.get('market_question', 'Unknown')[:45]}{Style.RESET_ALL}", w, "left", Fore.GREEN))
-    box_separator(w)
-    print(box_line(f"Time Left    : {Fore.CYAN}{time_left:.1f} minutes{Style.RESET_ALL}", w, "left", Fore.GREEN))
+    print(bingkai_line("💰 POSITION", w-2, Fore.CYAN, "left"))
+    print(bingkai_line(f"Entry Amount : ${position.get('entry_amount', 0):.2f} USDC", w-2, Fore.GREEN))
+    print(bingkai_line(f"Side         : {Fore.BLUE}{position.get('side', 'UNKNOWN')}{Style.RESET_ALL}", w-2, Fore.GREEN))
+    print(bingkai_line(f"Market       : {Fore.MAGENTA}{position.get('market_question', 'Unknown')[:55]}{Style.RESET_ALL}", w-2, Fore.GREEN))
+    bingkai_separator(w, Fore.GREEN)
+    
+    print(bingkai_line(f"Time Left    : {Fore.CYAN}{time_left:.1f} minutes{Style.RESET_ALL}", w-2, Fore.GREEN))
     
     if pnl != 0:
         pnl_color = Fore.GREEN if pnl > 0 else Fore.RED
-        print(box_line(f"P&L          : {pnl_color}{pnl:+.2f} USDC{Style.RESET_ALL}", w, "left", Fore.GREEN))
+        print(bingkai_line(f"P&L          : {pnl_color}{pnl:+.2f} USDC{Style.RESET_ALL}", w-2, Fore.GREEN))
     
-    box_border(False, w)
+    bingkai_bottom(w, Fore.GREEN)
     print()
 
 def print_trade_signal(signal, price, threshold):
-    """Print trade signal box"""
+    """Print trade signal dalam bingkai"""
     w = 70
-    box_border(True, w, Fore.YELLOW)
     
     if signal == "BUY_UP":
-        print(box_line("🟢 SIGNAL: BUY UP (RSI Oversold)", w, "center", Fore.GREEN + Style.BRIGHT))
+        bingkai_top(w, Fore.GREEN)
+        print(bingkai_line("🟢 SIGNAL: BUY UP (RSI Oversold)", w-2, Fore.GREEN + Style.BRIGHT, "center"))
     elif signal == "BUY_DOWN":
-        print(box_line("🔴 SIGNAL: BUY DOWN (RSI Overbought)", w, "center", Fore.RED + Style.BRIGHT))
+        bingkai_top(w, Fore.RED)
+        print(bingkai_line("🔴 SIGNAL: BUY DOWN (RSI Overbought)", w-2, Fore.RED + Style.BRIGHT, "center"))
     else:
-        print(box_line("⚪ SIGNAL: NEUTRAL (No Trade)", w, "center", Fore.YELLOW))
+        bingkai_top(w, Fore.YELLOW)
+        print(bingkai_line("⚪ SIGNAL: NEUTRAL (No Trade)", w-2, Fore.YELLOW, "center"))
     
-    box_separator(w)
-    print(box_line(f"Price: {price:.4f} | Threshold: {threshold[0]}-{threshold[1]}", w, "center", Fore.CYAN))
-    box_border(False, w, Fore.YELLOW)
+    bingkai_separator(w, Fore.GREEN)
+    print(bingkai_line(f"Price: {price:.4f} | Threshold: {threshold[0]}-{threshold[1]}", w-2, Fore.CYAN, "center"))
+    bingkai_bottom(w, Fore.YELLOW)
     print()
 
-def print_countdown(seconds, width=70):
-    """Print countdown bar"""
-    bar_width = width - 20
-    filled = int(bar_width * (1 - seconds/30))
-    bar = "█" * filled + "░" * (bar_width - filled)
-    print(f"{Fore.CYAN}Next scan: [{Fore.GREEN}{bar}{Fore.CYAN}] {seconds}s{Style.RESET_ALL}")
-
 def format_timestamp(dt: datetime) -> str:
-    """Format datetime to timestamp string"""
+    """Format datetime ke timestamp string"""
     return dt.strftime("%Y%m%d%H%M")
 
 def parse_end_date(date_str: str) -> datetime:
-    """Parse ISO date string to datetime"""
+    """Parse ISO date string ke datetime"""
     if date_str:
         return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
     return datetime.now()
