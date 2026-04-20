@@ -35,7 +35,7 @@ class TradeExecutor:
             creds = client.create_or_derive_api_creds()
             client.set_api_creds(creds)
             
-            logger.info("CLOB Client initialized successfully")
+            logger.info("CLOB Client connected")
             return client
             
         except Exception as e:
@@ -49,7 +49,6 @@ class TradeExecutor:
                 BalanceAllowanceParams(asset_type=AssetType.COLLATERAL)
             )
             balance_usdc = int(balance["balance"]) / 1e6
-            logger.info(f"Proxy Wallet Balance: {balance_usdc:.2f} USDC")
             return balance_usdc
             
         except Exception as e:
@@ -85,7 +84,7 @@ class TradeExecutor:
             Order response or None if failed
         """
         try:
-            logger.info(f"Placing MARKET {side} order: ${amount_usdc} on token {token_id[:20]}...")
+            logger.info(f"Placing MARKET {side} order: ${amount_usdc}")
             
             order_args = MarketOrderArgs(
                 token_id=token_id,
@@ -98,10 +97,10 @@ class TradeExecutor:
             response = self.client.post_order(signed_order, OrderType.FOK)
             
             if response and response.get("success"):
-                logger.info(f"✅ Order executed successfully: {response.get('orderID')}")
+                logger.info(f"Order executed: {response.get('orderID', 'N/A')}")
                 return response
             else:
-                logger.error(f"❌ Order failed: {response}")
+                logger.error(f"Order failed: {response}")
                 return None
                 
         except Exception as e:
@@ -122,7 +121,7 @@ class TradeExecutor:
             Order response or None if failed
         """
         try:
-            logger.info(f"Placing LIMIT {side} order: {size} @ {price} on token {token_id[:20]}...")
+            logger.info(f"Placing LIMIT {side} order: {size} @ {price}")
             
             order_args = OrderArgs(
                 token_id=token_id,
@@ -135,10 +134,10 @@ class TradeExecutor:
             response = self.client.post_order(signed_order, OrderType.GTC)
             
             if response and response.get("success"):
-                logger.info(f"✅ Limit order placed: {response.get('orderID')}")
+                logger.info(f"Limit order placed: {response.get('orderID', 'N/A')}")
                 return response
             else:
-                logger.error(f"❌ Limit order failed: {response}")
+                logger.error(f"Limit order failed: {response}")
                 return None
                 
         except Exception as e:
