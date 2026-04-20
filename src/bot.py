@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 
 # Add project root to Python path
-# Ini memastikan folder config dan src bisa diimport
 project_root = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(project_root))
 
@@ -22,7 +21,13 @@ from src.analyzer import BTCAnalyzer
 from src.scanner import MarketScanner
 from src.executor import TradeExecutor
 from src.position_monitor import PositionMonitor
-from src.utils import setup_logging, print_scanning_header, print_monitoring_header
+from src.utils import (
+    setup_logging, 
+    print_scanning_status, 
+    print_monitoring_status,
+    print_signal,
+    print_trade_result
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +55,25 @@ class PolymarketBTCBot:
         self.current_position = None
         self.last_scan_time = None
         
-        logger.info("🚀 Polymarket BTC Bot initialized")
-        logger.info(f"💰 Position Size: ${config.position_size}")
-        logger.info(f"📊 RSI Thresholds: <{config.rsi_oversold} (UP) >{config.rsi_overbought} (DOWN)")
+        # Clear screen and show startup
+        os.system('cls' if os.name == 'nt' else 'clear')
+        print("\n" + "="*70)
+        print("🚀  POLYMARKET BTC BOT v1.0".center(70))
+        print("="*70)
+        print(f"  💰 Position Size : ${config.position_size}")
+        print(f"  📊 RSI Threshold : <{config.rsi_oversold} (UP) | >{config.rsi_overbought} (DOWN)")
+        print(f"  ⏱  Time Window   : {config.min_time_remaining}-{config.max_time_remaining} min")
+        print(f"  💵 Price Range   : {config.price_min}-{config.price_max}")
+        print("="*70 + "\n")
+        
+        logger.info("Bot initialized successfully")
     
     def scan_market(self) -> Optional[Dict]:
         """
         Scan market and analyze momentum
         Returns market data if suitable opportunity found
         """
-        logger.info("🔍 Scanning for BTC 5m markets...")
+        logger.info("Scanning for BTC 5m markets...")
         
         # Get RSI
         rsi = self.analyzer.get_rsi()
@@ -71,25 +85,25 @@ class PolymarketBTCBot:
         # Find markets
         markets = self.scanner.get_btc_5min_markets()
         
-        if not markets:
-            logger.info("No suitable BTC 5m markets found")
-            print_scanning_header(balance, rsi or 0, "", 0)
-            return None
+        # Get best market
+        best_market = markets[0] if markets else None
         
-        # Get best market (closest to 5 min)
-        best_market = markets[0]
-        
-        # Display scanning status
-        print_scanning_header(
+        # Display clean scanning status
+        print_scanning_status(
             balance=balance,
             rsi=rsi or 0,
-            market_title=best_market["question"],
-            time_remaining=best_market["time_remaining"]
+            market_title=best_market["question"] if best_market else "",
+            time_remaining=best_market["time_remaining"] if best_market else 0,
+            markets_found=len(markets)
         )
+        
+        if not best_market:
+            logger.info("No suitable BTC 5m markets found")
+            return None
         
         # Check if we should trade
         if signal == "NEUTRAL":
-            logger.info(f"RSI neutral ({rsi:.2f}), skipping trade")
+            logger.info(f"RSI {rsi:.2f} neutral, skipping trade")
             return None
         
         # Check price threshold
@@ -105,7 +119,8 @@ class PolymarketBTCBot:
         prices = self.executor.get_market_price(target_token)
         best_ask = prices["best_ask"]
         
-        logger.info(f"Current price: {best_ask:.4f} | Threshold: {self.config.price_min}-{self.config.price_max}")
+        # Display signal
+        print_signal(signal, best_ask, (self.config.price_min, self.config.price_max))
         
         if not (self.config.price_min <= best_ask <= self.config.price_max):
             logger.info(f"Price {best_ask:.4f} outside threshold range, skipping")
@@ -130,7 +145,7 @@ class PolymarketBTCBot:
         signal = trade_data["signal"]
         token_id = trade_data["token_id"]
         
-        logger.info(f"🎯 Executing {signal} entry for {market['question']}")
+        logger.info(f"Executing {signal} entry for {market['question']}")
         
         # Place market order
         result = self.executor.place_market_order(
@@ -153,10 +168,12 @@ class PolymarketBTCBot:
             }
             
             self.state = "MONITORING"
-            logger.info("✅ Entry executed successfully, switching to MONITORING mode")
+            print_trade_result(True, result.get("orderID"))
+            logger.info("Entry executed successfully, switching to MONITORING mode")
             return True
         else:
-            logger.error("❌ Entry failed")
+            print_trade_result(False)
+            logger.error("Entry failed")
             return False
     
     def monitor_position(self):
@@ -170,7 +187,7 @@ class PolymarketBTCBot:
         
         # Check if market resolved
         if self.monitor.is_market_resolved(condition_id):
-            logger.info("🎉 Market resolved! Switching to EXITING mode")
+            logger.info("Market resolved! Switching to EXITING mode")
             self.state = "EXITING"
             return
         
@@ -182,7 +199,7 @@ class PolymarketBTCBot:
             time_left = 0
         
         # Display monitoring status
-        print_monitoring_header(
+        print_monitoring_status(
             amount=self.current_position["entry_amount"],
             side=f"BUY {self.current_position['side']}",
             market_title=self.current_position["market_question"],
@@ -191,7 +208,7 @@ class PolymarketBTCBot:
         
         # Check if we should force exit (time expired)
         if time_left <= 0:
-            logger.info("⏰ Market expired, switching to EXITING")
+            logger.info("Market expired, switching to EXITING")
             self.state = "EXITING"
     
     def exit_position(self):
@@ -200,27 +217,27 @@ class PolymarketBTCBot:
             self.state = "SCANNING"
             return
         
-        logger.info("💰 Attempting to exit position...")
+        logger.info("Attempting to exit position...")
         
         winning_outcome = self.monitor.get_winning_outcome(
             self.current_position["condition_id"]
         )
         
         if winning_outcome:
-            logger.info(f"🏆 Winning outcome: {winning_outcome}")
+            logger.info(f"Winning outcome: {winning_outcome}")
             if winning_outcome.upper() == self.current_position["side"]:
-                logger.info("✅ Position WON!")
+                logger.info("Position WON!")
             else:
-                logger.info("❌ Position LOST")
+                logger.info("Position LOST")
         
         # Reset position
         self.current_position = None
         self.state = "SCANNING"
-        logger.info("🔄 Returned to SCANNING mode")
+        logger.info("Returned to SCANNING mode")
     
     def run(self):
         """Main bot loop"""
-        logger.info("🟢 Bot started, entering main loop...")
+        logger.info("Bot started, entering main loop...")
         
         try:
             while True:
@@ -245,9 +262,9 @@ class PolymarketBTCBot:
                     time.sleep(5)
                     
         except KeyboardInterrupt:
-            logger.info("🛑 Bot stopped by user")
+            logger.info("Bot stopped by user")
         except Exception as e:
-            logger.error(f"💥 Error in main loop: {e}", exc_info=True)
+            logger.error(f"Error in main loop: {e}", exc_info=True)
             # Attempt to recover
             time.sleep(60)
             self.run()  # Restart
